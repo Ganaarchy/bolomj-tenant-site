@@ -1,62 +1,67 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 
-import { ContactSection } from "@/components/tenant/ContactSection";
 import { ErrorState } from "@/components/tenant/ErrorState";
 import { TenantFooter } from "@/components/tenant/TenantFooter";
 import { TenantHeader } from "@/components/tenant/TenantHeader";
-import { TenantHero } from "@/components/tenant/TenantHero";
 import { TenantNotFound } from "@/components/tenant/TenantNotFound";
 import { TenantShell } from "@/components/tenant/TenantShell";
-import { TourGrid } from "@/components/tenant/TourGrid";
+import { TourDetail } from "@/components/tenant/TourDetail";
 import { ApiError, apiFetch } from "@/lib/api";
 import { resolveTenantSlug } from "@/lib/tenant";
 import type { PublicTenant, TenantPublicTour } from "@/lib/types";
 
-type HomeProps = {
+type TourPageProps = {
+  params: Promise<{ tourSlug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export async function generateMetadata({ searchParams }: HomeProps): Promise<Metadata> {
-  const slug = await tenantSlugFromRequest(searchParams);
-  if (!slug) {
+export async function generateMetadata({ params, searchParams }: TourPageProps): Promise<Metadata> {
+  const tenantSlug = await tenantSlugFromRequest(searchParams);
+  const { tourSlug } = await params;
+
+  if (!tenantSlug) {
     return {
-      title: "Bolomj - Аяллын вебсайт",
-      description: "Tenant slug сонгогдсон үед байгууллагын аяллын вебсайт ачаална.",
+      title: "Аялал олдсонгүй",
+      description: "Tenant slug сонгогдоогүй тул аяллын дэлгэрэнгүй мэдээлэл ачаалах боломжгүй.",
     };
   }
 
   try {
-    const tenant = await apiFetch<PublicTenant>(`/public/tenants/by-slug/${slug}`, {
-      cache: "no-store",
-    });
+    const [tenant, tour] = await Promise.all([
+      apiFetch<PublicTenant>(`/public/tenants/by-slug/${tenantSlug}`, { cache: "no-store" }),
+      apiFetch<TenantPublicTour>(`/public/tenants/${tenantSlug}/tours/${tourSlug}`, {
+        cache: "no-store",
+      }),
+    ]);
 
     return {
-      title: `${tenant.name} - Аяллын вебсайт`,
-      description: `${tenant.name}-ийн аяллууд болон захиалгын мэдээлэл.`,
+      title: `${tour.title} - ${tenant.name}`,
+      description: tour.description || `${tenant.name}-ийн аяллын дэлгэрэнгүй мэдээлэл.`,
     };
   } catch {
     return {
-      title: "Байгууллагын вебсайт олдсонгүй",
-      description: "Tenant slug олдоогүй эсвэл байгууллагын вебсайт идэвхгүй байна.",
+      title: "Аялал олдсонгүй",
+      description: "Аяллын slug олдоогүй эсвэл аялал нийтлэгдээгүй байна.",
     };
   }
 }
 
-export default async function Home({ searchParams }: HomeProps) {
+export default async function TourPage({ params, searchParams }: TourPageProps) {
   const tenantSlug = await tenantSlugFromRequest(searchParams);
+  const { tourSlug } = await params;
 
   if (!tenantSlug) {
     return (
       <TenantNotFound
         title="Tenant сонгоогүй байна"
-        message="Локал орчинд /?tenant=slug ашиглах эсвэл tenant subdomain-оор нэвтэрнэ үү. Reserved subdomain дээр tenant вебсайт ачаалахгүй."
+        message="Локал орчинд /?tenant=slug ашиглах эсвэл tenant subdomain-оор нэвтэрнэ үү."
       />
     );
   }
 
   let tenant: PublicTenant;
-  let tours: TenantPublicTour[];
+  let tour: TenantPublicTour;
 
   try {
     tenant = await apiFetch<PublicTenant>(`/public/tenants/by-slug/${tenantSlug}`, {
@@ -81,26 +86,37 @@ export default async function Home({ searchParams }: HomeProps) {
   }
 
   try {
-    tours = await apiFetch<TenantPublicTour[]>(`/public/tenants/${tenantSlug}/tours`, {
+    tour = await apiFetch<TenantPublicTour>(`/public/tenants/${tenantSlug}/tours/${tourSlug}`, {
       cache: "no-store",
     });
   } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return (
+        <TenantShell tenant={tenant}>
+          <TenantHeader tenant={tenant} />
+          <TenantNotFound
+            title="Аялал олдсонгүй"
+            message={`"${tourSlug}" аялал нийтлэгдсэн эсэх эсвэл slug зөв эсэхийг шалгана уу.`}
+            actionLabel="Аяллууд руу буцах"
+            actionHref={`/?tenant=${tenant.slug}#tours`}
+          />
+          <TenantFooter tenant={tenant} />
+        </TenantShell>
+      );
+    }
+
     return (
       <ErrorState
-        title="Аяллууд ачаалагдсангүй"
+        title="Аяллын мэдээлэл ачаалагдсангүй"
         message={error instanceof Error ? error.message : "Дахин оролдоно уу."}
       />
     );
   }
 
-  const featuredTour = tours.find((tour) => tour.is_featured) || tours[0];
-
   return (
     <TenantShell tenant={tenant}>
       <TenantHeader tenant={tenant} />
-      <TenantHero tenant={tenant} featuredTour={featuredTour} />
-      <TourGrid tenant={tenant} tours={tours} />
-      <ContactSection tenant={tenant} />
+      <TourDetail tenant={tenant} tour={tour} />
       <TenantFooter tenant={tenant} />
     </TenantShell>
   );
