@@ -2,7 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogIn } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -25,7 +26,9 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -38,13 +41,13 @@ export function LoginForm() {
     setError(null);
 
     try {
-      const response = await apiFetch<LoginResponse>("/auth/login", {
+      const response = await apiFetch<LoginResponse>("/auth/customer/login", {
         method: "POST",
         body: values,
       });
 
       setAuth(response.accessToken, response.user);
-      router.push("/profile");
+      router.push(returnTo || "/profile");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Нэвтрэхэд алдаа гарлаа");
     }
@@ -55,7 +58,7 @@ export function LoginForm() {
       <CardHeader>
         <CardTitle>Нэвтрэх</CardTitle>
         <CardDescription>
-          Одоогоор зөвхөн backend дээр байгаа хэрэглэгчид `POST /auth/login`-оор нэвтэрнэ.
+          Customer эрхтэй хэрэглэгчээр нэвтэрч аялал захиална.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -86,7 +89,17 @@ export function LoginForm() {
             </Button>
           </form>
         </Form>
+        <Button asChild variant="link" className="mt-4 w-full">
+          <Link href={`/register${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}>
+            Бүртгэл үүсгэх
+          </Link>
+        </Button>
       </CardContent>
     </Card>
   );
+}
+
+function safeReturnTo(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "";
+  return value;
 }

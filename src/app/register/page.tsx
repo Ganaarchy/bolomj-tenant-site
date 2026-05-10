@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 
 export const metadata: Metadata = {
-  title: "Бүртгэл түр хаалттай",
+  title: "Бүртгүүлэх",
 };
 
 export default function RegisterPage() {

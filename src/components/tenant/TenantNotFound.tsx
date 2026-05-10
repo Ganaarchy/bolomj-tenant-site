@@ -7,7 +7,7 @@ export function TenantNotFound({
   title = "Байгууллагын вебсайт олдсонгүй.",
   message = "Домэйн эсвэл локал хөгжүүлэлтийн tenant параметрээ шалгана уу.",
   actionLabel = "Жишээ tenant нээх",
-  actionHref = "/?tenant=nomad",
+  actionHref = "/?tenant=blue-sky-travel",
 }: {
   title?: string;
   message?: string;
