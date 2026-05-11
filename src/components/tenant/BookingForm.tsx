@@ -200,11 +200,7 @@ async function createBooking(
 
 function shouldFallbackToGeneralBookingEndpoint(err: unknown) {
   if (!(err instanceof ApiError)) return false;
-
-  return (
-    err.status === 404 &&
-    /tenant|tour|not found|not bookable/i.test(err.message)
-  );
+  return err.status === 404;
 }
 
 function bookingErrorMessage(err: unknown) {
