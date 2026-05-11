@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { BookingForm } from "@/components/tenant/BookingForm";
 import { SafeImage } from "@/components/tenant/SafeImage";
+import { TourMediaGallery } from "@/components/tenant/TourMediaGallery";
 import { formatDate, formatDestination, formatDuration, formatPrice } from "@/lib/format";
 import type { PublicTenant, TenantPublicTour } from "@/lib/types";
 
@@ -71,33 +72,19 @@ export function TourDetail({
               </CardContent>
             </Card>
 
-            {detailPhotos.length ? (
-              <section>
-                <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Аяллын зургууд</h2>
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  {detailPhotos.map((photo) => (
-                    <figure key={photo.id} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                      <div className="relative aspect-[4/3] bg-slate-100">
-                        <SafeImage
-                          src={photo.url}
-                          alt={photo.caption || `${tour.title} аяллын зураг`}
-                          sizes="(min-width: 1024px) 360px, (min-width: 640px) 50vw, 100vw"
-                          fallback={<span className="px-4 text-center text-sm font-medium">{photo.caption || tour.title}</span>}
-                        />
-                      </div>
-                      {photo.caption ? (
-                        <figcaption className="px-4 py-3 text-sm leading-5 text-slate-600">{photo.caption}</figcaption>
-                      ) : null}
-                    </figure>
-                  ))}
-                </div>
-              </section>
-            ) : null}
+            <TourMediaGallery photos={detailPhotos} tourTitle={tour.title} />
 
             {detailVideo ? (
               <section>
-                <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Аяллын танилцуулга видео</h2>
-                <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Аяллын танилцуулга видео</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Богино танилцуулга видеог удирдлагатайгаар үзнэ үү.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-slate-950 shadow-sm">
                   <video
                     className="aspect-video w-full bg-slate-950"
                     controls
