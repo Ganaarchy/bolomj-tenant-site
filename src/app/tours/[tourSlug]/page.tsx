@@ -9,6 +9,7 @@ import { TenantShell } from "@/components/tenant/TenantShell";
 import { TourDetail } from "@/components/tenant/TourDetail";
 import { ApiError, apiFetch } from "@/lib/api";
 import { resolveTenantSlug } from "@/lib/tenant";
+import { normalizeTenantPublicTour } from "@/lib/tours";
 import type { PublicTenant, TenantPublicTour } from "@/lib/types";
 
 type TourPageProps = {
@@ -28,12 +29,13 @@ export async function generateMetadata({ params, searchParams }: TourPageProps):
   }
 
   try {
-    const [tenant, tour] = await Promise.all([
+    const [tenant, tourResponse] = await Promise.all([
       apiFetch<PublicTenant>(`/public/tenants/by-slug/${tenantSlug}`, { cache: "no-store" }),
       apiFetch<TenantPublicTour>(`/public/tenants/${tenantSlug}/tours/${tourSlug}`, {
         cache: "no-store",
       }),
     ]);
+    const tour = normalizeTenantPublicTour(tourResponse);
 
     return {
       title: `${tour.title} - ${tenant.name}`,
@@ -86,9 +88,13 @@ export default async function TourPage({ params, searchParams }: TourPageProps) 
   }
 
   try {
-    tour = await apiFetch<TenantPublicTour>(`/public/tenants/${tenantSlug}/tours/${tourSlug}`, {
-      cache: "no-store",
-    });
+    const tourResponse = await apiFetch<TenantPublicTour>(
+      `/public/tenants/${tenantSlug}/tours/${tourSlug}`,
+      {
+        cache: "no-store",
+      },
+    );
+    tour = normalizeTenantPublicTour(tourResponse);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return (

@@ -90,6 +90,22 @@ export type PublicTenant = {
   website: PublicTenantWebsite;
 };
 
+export type TourDetailPhoto = {
+  id: string;
+  url: string;
+  caption: string | null;
+  sortOrder: number;
+  sort_order?: number | null;
+};
+
+export type TourDetailVideo = {
+  id: string;
+  url: string;
+  caption: string | null;
+  sortOrder: number;
+  sort_order?: number | null;
+};
+
 export type TenantPublicTour = {
   id: string;
   tenant_id: string;
@@ -111,6 +127,11 @@ export type TenantPublicTour = {
   is_featured: boolean;
   published_to_marketplace: boolean;
   cover_image_url?: string | null;
+  coverImageUrl?: string | null;
+  detailPhotos: TourDetailPhoto[];
+  detail_photos?: TourDetailPhoto[] | null;
+  detailVideo: TourDetailVideo | null;
+  detail_video?: TourDetailVideo | null;
   created_at?: string;
   updated_at?: string;
 };

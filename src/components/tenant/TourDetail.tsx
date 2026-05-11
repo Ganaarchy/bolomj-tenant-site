@@ -17,7 +17,9 @@ export function TourDetail({
   tenant: PublicTenant;
   tour: TenantPublicTour;
 }) {
-  const imageSrc = tour.cover_image_url || tenant.banner_url;
+  const imageSrc = tour.coverImageUrl || tour.cover_image_url || tenant.banner_url;
+  const detailPhotos = tour.detailPhotos || [];
+  const detailVideo = tour.detailVideo;
   const includes = splitLines(tour.includes_text);
   const excludes = splitLines(tour.excludes_text);
 
@@ -68,6 +70,46 @@ export function TourDetail({
                 <InfoItem icon={<CalendarDays />} label="Эхлэх / дуусах" value={`${formatDate(tour.start_date)} - ${formatDate(tour.end_date)}`} />
               </CardContent>
             </Card>
+
+            {detailPhotos.length ? (
+              <section>
+                <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Аяллын зургууд</h2>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  {detailPhotos.map((photo) => (
+                    <figure key={photo.id} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                      <div className="relative aspect-[4/3] bg-slate-100">
+                        <SafeImage
+                          src={photo.url}
+                          alt={photo.caption || `${tour.title} аяллын зураг`}
+                          sizes="(min-width: 1024px) 360px, (min-width: 640px) 50vw, 100vw"
+                          fallback={<span className="px-4 text-center text-sm font-medium">{photo.caption || tour.title}</span>}
+                        />
+                      </div>
+                      {photo.caption ? (
+                        <figcaption className="px-4 py-3 text-sm leading-5 text-slate-600">{photo.caption}</figcaption>
+                      ) : null}
+                    </figure>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {detailVideo ? (
+              <section>
+                <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Аяллын танилцуулга видео</h2>
+                <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+                  <video
+                    className="aspect-video w-full bg-slate-950"
+                    controls
+                    preload="metadata"
+                    src={detailVideo.url}
+                  />
+                </div>
+                {detailVideo.caption ? (
+                  <p className="mt-3 text-sm leading-6 text-slate-600">{detailVideo.caption}</p>
+                ) : null}
+              </section>
+            ) : null}
 
             {tour.meeting_point ? (
               <section>
