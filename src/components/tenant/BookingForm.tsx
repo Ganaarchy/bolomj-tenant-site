@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Send, Trash2, UserCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -13,9 +13,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { apiFetch } from "@/lib/api";
-import { getStoredUser } from "@/lib/auth";
-import type { BookingCreateRequest, BookingCreateResponse, TenantPublicTour } from "@/lib/types";
+import { ApiError, apiFetch } from "@/lib/api";
+import {
+  AUTH_CHANGE_EVENT,
+  getAccessToken,
+  getStoredUser,
+  loginPathWithReturnTo,
+  setStoredUser,
+} from "@/lib/auth";
+import type { AuthUser, BookingCreateRequest, BookingCreateResponse, TenantPublicTour } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const optionalEmailSchema = z
@@ -54,6 +60,18 @@ const bookingSchema = z.object({
 type BookingFormInput = z.input<typeof bookingSchema>;
 type BookingFormValues = z.output<typeof bookingSchema>;
 type PassengerFormValue = BookingFormInput["passengers"][number];
+type BookingAuthState = {
+  isLoading: boolean;
+  accessToken: string | null;
+  user: AuthUser | null;
+};
+type BookingAuth = {
+  accessToken: string;
+  user: AuthUser;
+};
+
+const CUSTOMER_BOOKING_ROLE_MESSAGE = "Аялал захиалахын тулд хэрэглэгчийн эрхээр нэвтэрнэ үү.";
+const AUTH_LOADING_MESSAGE = "Нэвтрэлтийн мэдээлэл шалгаж байна. Түр хүлээгээд дахин оролдоно уу.";
 
 const emptyPassenger = (isPrimary = false): PassengerFormValue => ({
   full_name: "",
@@ -70,6 +88,11 @@ const emptyPassenger = (isPrimary = false): PassengerFormValue => ({
 export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: TenantPublicTour }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [authState, setAuthState] = useState<BookingAuthState>({
+    isLoading: true,
+    accessToken: null,
+    user: null,
+  });
   const lastSyncedPrimaryRef = useRef({ full_name: "", email: "", phone: "" });
   const form = useForm<BookingFormInput, unknown, BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -96,8 +119,58 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
   const normalizedPrimaryIndex = primaryIndex >= 0 ? primaryIndex : 0;
 
   useEffect(() => {
-    const storedUser = getStoredUser();
-    if (storedUser?.role !== "customer") return;
+    let cancelled = false;
+
+    async function loadAuthState() {
+      const accessToken = getAccessToken();
+      const storedUser = getStoredUser();
+
+      if (!accessToken) {
+        if (!cancelled) {
+          setAuthState({ isLoading: false, accessToken: null, user: null });
+        }
+        return;
+      }
+
+      if (storedUser) {
+        if (!cancelled) {
+          setAuthState({ isLoading: false, accessToken, user: storedUser });
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setAuthState({ isLoading: true, accessToken, user: null });
+      }
+
+      try {
+        const profile = await apiFetch<AuthUser>("/auth/me", { accessToken });
+        if (cancelled) return;
+        setStoredUser(profile);
+        setAuthState({ isLoading: false, accessToken, user: profile });
+      } catch (err) {
+        if (cancelled) return;
+        setAuthState({ isLoading: false, accessToken, user: null });
+        if (!(err instanceof ApiError) || err.status !== 401) {
+          setError(err instanceof Error ? err.message : "Нэвтрэлтийн мэдээлэл шалгахад алдаа гарлаа.");
+        }
+      }
+    }
+
+    void loadAuthState();
+    window.addEventListener("storage", loadAuthState);
+    window.addEventListener(AUTH_CHANGE_EVENT, loadAuthState);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", loadAuthState);
+      window.removeEventListener(AUTH_CHANGE_EVENT, loadAuthState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const storedUser = authState.user;
+    if (!isCustomerBookingRole(storedUser)) return;
 
     if (!form.getValues("customer_first_name")) {
       form.setValue("customer_first_name", storedUser.first_name, { shouldDirty: false });
@@ -110,7 +183,7 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
     if (!form.getValues("customer_email")) {
       form.setValue("customer_email", storedUser.email, { shouldDirty: false });
     }
-  }, [form]);
+  }, [authState.user, form]);
 
   useEffect(() => {
     const firstPassenger = form.getValues("passengers.0");
@@ -168,7 +241,39 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
     });
   }
 
-  async function onSubmit(values: BookingFormValues) {
+  function requireBookingAuth(): BookingAuth | null {
+    if (authState.isLoading) {
+      setError(AUTH_LOADING_MESSAGE);
+      return null;
+    }
+
+    if (!authState.accessToken || !authState.user) {
+      router.push(loginPathWithReturnTo());
+      return null;
+    }
+
+    if (!isCustomerBookingRole(authState.user)) {
+      setError(CUSTOMER_BOOKING_ROLE_MESSAGE);
+      return null;
+    }
+
+    return {
+      accessToken: authState.accessToken,
+      user: authState.user,
+    };
+  }
+
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    const bookingAuth = requireBookingAuth();
+    if (!bookingAuth) {
+      event.preventDefault();
+      return;
+    }
+
+    void form.handleSubmit((values) => onSubmit(values, bookingAuth))(event);
+  }
+
+  async function onSubmit(values: BookingFormValues, bookingAuth: BookingAuth) {
     setError(null);
     const passengersPayload = values.passengers.map((passenger, index) => ({
       full_name: passenger.full_name,
@@ -194,7 +299,7 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
     };
 
     try {
-      const response = await createBooking(tenantSlug, payload);
+      const response = await createBooking(tenantSlug, payload, bookingAuth.accessToken);
 
       const bookingId = response.booking?.id;
       if (!bookingId) {
@@ -205,9 +310,16 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
       params.set("booking", bookingId);
       router.push(`/booking-success?${params.toString()}`);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.push(loginPathWithReturnTo());
+        return;
+      }
+
       setError(bookingErrorMessage(err));
     }
   }
+
+  const hasUnsupportedRole = Boolean(authState.user && !isCustomerBookingRole(authState.user));
 
   return (
     <Card className="rounded-lg border-slate-200">
@@ -216,7 +328,19 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+          <form className="space-y-6" onSubmit={handleFormSubmit} noValidate>
+            {authState.isLoading ? (
+              <Alert>
+                <AlertDescription>Нэвтрэлтийн төлөв шалгаж байна...</AlertDescription>
+              </Alert>
+            ) : null}
+
+            {hasUnsupportedRole ? (
+              <Alert variant="destructive">
+                <AlertDescription>{CUSTOMER_BOOKING_ROLE_MESSAGE}</AlertDescription>
+              </Alert>
+            ) : null}
+
             {error ? (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -439,7 +563,12 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
               <FormMessage>{form.formState.errors.note?.message}</FormMessage>
             </FormItem>
 
-            <Button className="w-full" size="lg" type="submit" disabled={form.formState.isSubmitting}>
+            <Button
+              className="w-full"
+              size="lg"
+              type="submit"
+              disabled={form.formState.isSubmitting || authState.isLoading || hasUnsupportedRole}
+            >
               <Send className="h-4 w-4" />
               {form.formState.isSubmitting ? "Илгээж байна..." : "Захиалга илгээх"}
             </Button>
@@ -453,9 +582,11 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
 async function createBooking(
   tenantSlug: string,
   payload: BookingCreateRequest,
+  accessToken: string,
 ) {
   return apiFetch<BookingCreateResponse>(`/public/tenants/${tenantSlug}/bookings`, {
     method: "POST",
+    accessToken,
     body: payload,
   });
 }
@@ -465,7 +596,17 @@ function emptyToNull(value?: string | null) {
   return trimmed || null;
 }
 
+function isCustomerBookingRole(user: AuthUser | null): user is AuthUser {
+  // Customer accounts are global and have tenant_id = null. Tenant site booking checks customer role, not tenant_id.
+  return user?.role === "customer" || user?.role === "user";
+}
+
 function bookingErrorMessage(err: unknown) {
+  if (err instanceof ApiError) {
+    if (err.status === 403) return CUSTOMER_BOOKING_ROLE_MESSAGE;
+    if (err.status === 500) return err.message || "Backend алдаа гарлаа. Түр хүлээгээд дахин оролдоно уу.";
+  }
+
   const message = err instanceof Error ? err.message : "";
   if (message.toLowerCase().includes("row-level security")) {
     return "Захиалга үүсгэхийг backend-ийн RLS policy хааж байна. Түр хүлээгээд дахин оролдоно уу эсвэл байгууллагатай холбогдоно уу.";

@@ -27,6 +27,19 @@ export function getStoredUser(): AuthUser | null {
   }
 }
 
+export function getCurrentReturnTo() {
+  if (typeof window === "undefined") return "";
+
+  const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (!returnTo || returnTo.startsWith("/login")) return "";
+
+  return returnTo;
+}
+
+export function loginPathWithReturnTo(returnTo = getCurrentReturnTo()) {
+  return returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : "/login";
+}
+
 export function setAuth(accessToken: string, user: AuthUser) {
   window.localStorage.setItem(STORAGE_KEYS.accessToken, accessToken);
   window.localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
@@ -50,8 +63,9 @@ export function cleanupUnauthorized(redirectTo = "/login") {
   clearAuth();
 
   if (typeof window === "undefined") return;
-  if (!window.location.pathname.startsWith(redirectTo)) {
-    window.location.assign(redirectTo);
+  if (!window.location.pathname.startsWith("/login")) {
+    const target = redirectTo === "/login" ? loginPathWithReturnTo() : redirectTo;
+    window.location.assign(target);
   }
 }
 

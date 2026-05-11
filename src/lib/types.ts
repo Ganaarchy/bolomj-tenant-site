@@ -14,7 +14,7 @@ export type ApiErrorResponse = {
 
 export type ApiResponse<T> = T | ApiDataResponse<T>;
 
-export type UserRole = "guest" | "customer" | "system_admin" | "tenant_admin";
+export type UserRole = "guest" | "user" | "customer" | "system_admin" | "tenant_admin";
 
 export type TourStatus = "draft" | "published" | "archived";
 
