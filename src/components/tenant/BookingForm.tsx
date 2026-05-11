@@ -14,7 +14,7 @@ import { Form, FormControl, FormItem, FormLabel, FormMessage } from "@/component
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiFetch } from "@/lib/api";
-import { getAccessToken, getStoredUser } from "@/lib/auth";
+import { getStoredUser } from "@/lib/auth";
 import type { BookingCreateResponse, CreateBookingPayload, TenantPublicTour } from "@/lib/types";
 
 const bookingSchema = z.object({
@@ -63,8 +63,6 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
 
   async function onSubmit(values: BookingFormValues) {
     setError(null);
-    const storedUser = getStoredUser();
-    const customerAccessToken = storedUser?.role === "customer" ? getAccessToken() : null;
     const payload: CreateBookingPayload = {
       tour_id: tour.id,
       customer_first_name: values.customer_first_name,
@@ -76,7 +74,7 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
     };
 
     try {
-      const response = await createBooking(tenantSlug, payload, customerAccessToken);
+      const response = await createBooking(tenantSlug, payload);
 
       const bookingId = response.booking?.id;
       if (!bookingId) {
@@ -177,28 +175,25 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
 async function createBooking(
   tenantSlug: string,
   payload: CreateBookingPayload,
-  customerAccessToken: string | null,
 ) {
   try {
-    return await apiFetch<BookingCreateResponse>(`/public/tenants/${tenantSlug}/bookings`, {
+    return await apiFetch<BookingCreateResponse>("/bookings", {
       method: "POST",
-      accessToken: customerAccessToken,
       body: payload,
     });
   } catch (err) {
-    if (!shouldFallbackToGeneralBookingEndpoint(err)) {
+    if (!shouldFallbackToPublicTenantBookingEndpoint(err)) {
       throw err;
     }
 
-    return apiFetch<BookingCreateResponse>("/bookings", {
+    return apiFetch<BookingCreateResponse>(`/public/tenants/${tenantSlug}/bookings`, {
       method: "POST",
-      accessToken: customerAccessToken,
       body: payload,
     });
   }
 }
 
-function shouldFallbackToGeneralBookingEndpoint(err: unknown) {
+function shouldFallbackToPublicTenantBookingEndpoint(err: unknown) {
   if (!(err instanceof ApiError)) return false;
   return err.status === 404;
 }
