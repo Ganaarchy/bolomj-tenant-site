@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { CalendarDays, LogIn, UserPlus } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { SafeImage } from "@/components/tenant/SafeImage";
+import { TenantAuthActions } from "@/components/tenant/TenantAuthActions";
 import type { PublicTenant } from "@/lib/types";
 
 type TenantHeaderProps = {
@@ -39,18 +40,7 @@ export function TenantHeader({ tenant }: TenantHeaderProps) {
           <Button asChild variant="ghost">
             <Link href={toursHref}>Аяллууд</Link>
           </Button>
-          <Button asChild variant="ghost">
-            <Link href="/login">
-              <LogIn className="h-4 w-4" />
-              Нэвтрэх
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/register">
-              <UserPlus className="h-4 w-4" />
-              Бүртгүүлэх
-            </Link>
-          </Button>
+          <TenantAuthActions />
         </nav>
 
         <Button asChild size="sm" className="md:hidden">

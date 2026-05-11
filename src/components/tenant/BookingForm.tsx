@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -13,9 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 import { getAccessToken, getStoredUser } from "@/lib/auth";
-import type { BookingCreateResponse, TenantPublicTour } from "@/lib/types";
+import type { BookingCreateResponse, CreateBookingPayload, TenantPublicTour } from "@/lib/types";
 
 const bookingSchema = z.object({
   customer_first_name: z.string().trim().min(1, "Нэрээ оруулна уу"),
@@ -44,25 +44,39 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
     },
   });
 
+  useEffect(() => {
+    const storedUser = getStoredUser();
+    if (storedUser?.role !== "customer") return;
+
+    if (!form.getValues("customer_first_name")) {
+      form.setValue("customer_first_name", storedUser.first_name, { shouldDirty: false });
+    }
+
+    if (!form.getValues("customer_last_name") && storedUser.last_name) {
+      form.setValue("customer_last_name", storedUser.last_name, { shouldDirty: false });
+    }
+
+    if (!form.getValues("customer_email")) {
+      form.setValue("customer_email", storedUser.email, { shouldDirty: false });
+    }
+  }, [form]);
+
   async function onSubmit(values: BookingFormValues) {
     setError(null);
     const storedUser = getStoredUser();
     const customerAccessToken = storedUser?.role === "customer" ? getAccessToken() : null;
+    const payload: CreateBookingPayload = {
+      tour_id: tour.id,
+      customer_first_name: values.customer_first_name,
+      customer_last_name: values.customer_last_name || null,
+      customer_email: values.customer_email,
+      customer_phone: values.customer_phone || null,
+      traveler_count: values.traveler_count,
+      note: values.note || null,
+    };
 
     try {
-      const response = await apiFetch<BookingCreateResponse>(`/public/tenants/${tenantSlug}/bookings`, {
-        method: "POST",
-        accessToken: customerAccessToken,
-        body: {
-          tour_id: tour.id,
-          customer_first_name: values.customer_first_name,
-          customer_last_name: values.customer_last_name || null,
-          customer_email: values.customer_email,
-          customer_phone: values.customer_phone || null,
-          traveler_count: values.traveler_count,
-          note: values.note || null,
-        },
-      });
+      const response = await createBooking(tenantSlug, payload, customerAccessToken);
 
       const bookingId = response.booking?.id;
       if (!bookingId) {
@@ -160,10 +174,43 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
   );
 }
 
+async function createBooking(
+  tenantSlug: string,
+  payload: CreateBookingPayload,
+  customerAccessToken: string | null,
+) {
+  try {
+    return await apiFetch<BookingCreateResponse>(`/public/tenants/${tenantSlug}/bookings`, {
+      method: "POST",
+      accessToken: customerAccessToken,
+      body: payload,
+    });
+  } catch (err) {
+    if (!shouldFallbackToGeneralBookingEndpoint(err)) {
+      throw err;
+    }
+
+    return apiFetch<BookingCreateResponse>("/bookings", {
+      method: "POST",
+      accessToken: customerAccessToken,
+      body: payload,
+    });
+  }
+}
+
+function shouldFallbackToGeneralBookingEndpoint(err: unknown) {
+  if (!(err instanceof ApiError)) return false;
+
+  return (
+    err.status === 404 &&
+    /tenant|tour|not found|not bookable/i.test(err.message)
+  );
+}
+
 function bookingErrorMessage(err: unknown) {
   const message = err instanceof Error ? err.message : "";
   if (message.toLowerCase().includes("row-level security")) {
-    return "Backend RLS policy blocked public booking creation. Please try again or contact the tenant.";
+    return "Захиалга үүсгэхийг backend-ийн RLS policy хааж байна. Түр хүлээгээд дахин оролдоно уу эсвэл байгууллагатай холбогдоно уу.";
   }
 
   return message || "Захиалга үүсгэхэд алдаа гарлаа";
