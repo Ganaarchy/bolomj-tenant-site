@@ -1,10 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LogIn, Send, UserPlus } from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -32,13 +31,7 @@ type BookingFormValues = z.output<typeof bookingSchema>;
 
 export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: TenantPublicTour }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-  const isCustomer = useSyncExternalStore(subscribeAuthStorage, getCustomerSnapshot, () => false);
-  const query = searchParams.toString();
-  const returnTo = `${pathname}${query ? `?${query}` : ""}#booking`;
-  const authQuery = `?returnTo=${encodeURIComponent(returnTo)}`;
   const form = useForm<BookingFormInput, unknown, BookingFormValues>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
@@ -55,11 +48,6 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
     setError(null);
     const storedUser = getStoredUser();
     const customerAccessToken = storedUser?.role === "customer" ? getAccessToken() : null;
-
-    if (!customerAccessToken) {
-      setError("Захиалга үүсгэхийн тулд customer эрхээр бүртгүүлж эсвэл нэвтэрнэ үү.");
-      return;
-    }
 
     try {
       const response = await apiFetch<BookingCreateResponse>(`/public/tenants/${tenantSlug}/bookings`, {
@@ -97,30 +85,6 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
       <CardContent>
         <Form {...form}>
           <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-            {!isCustomer ? (
-              <Alert>
-                <AlertDescription className="space-y-3">
-                  <p>
-                    Захиалга үүсгэхийн тулд customer эрхээр бүртгүүлж эсвэл нэвтэрнэ үү.
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button asChild size="sm">
-                      <Link href={`/register${authQuery}`}>
-                        <UserPlus className="h-4 w-4" />
-                        Бүртгүүлэх
-                      </Link>
-                    </Button>
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/login${authQuery}`}>
-                        <LogIn className="h-4 w-4" />
-                        Нэвтрэх
-                      </Link>
-                    </Button>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            ) : null}
-
             {error ? (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -199,17 +163,8 @@ export function BookingForm({ tenantSlug, tour }: { tenantSlug: string; tour: Te
 function bookingErrorMessage(err: unknown) {
   const message = err instanceof Error ? err.message : "";
   if (message.toLowerCase().includes("row-level security")) {
-    return "Backend RLS policy booking үүсгэхийг хориглолоо. Customer эрхээр нэвтэрсэн эсэхээ шалгаад дахин илгээнэ үү.";
+    return "Backend RLS policy blocked public booking creation. Please try again or contact the tenant.";
   }
 
   return message || "Захиалга үүсгэхэд алдаа гарлаа";
-}
-
-function getCustomerSnapshot() {
-  return getStoredUser()?.role === "customer" && Boolean(getAccessToken());
-}
-
-function subscribeAuthStorage(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
 }

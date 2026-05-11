@@ -170,15 +170,21 @@ export const RESERVED_SUBDOMAINS = [
   "localhost",
 ] as const;
 
-export const BLOCKED_CUSTOMER_ENDPOINTS = [
+export const CUSTOMER_ENDPOINTS_PENDING_VERIFICATION = [
   "POST /auth/customer/register",
   "POST /auth/customer/login",
   "GET /customer/bookings",
   "GET /customer/bookings/:id",
 ] as const;
 
-export type BlockedCustomerEndpoint = (typeof BLOCKED_CUSTOMER_ENDPOINTS)[number];
+export type CustomerEndpointPendingVerification = (typeof CUSTOMER_ENDPOINTS_PENDING_VERIFICATION)[number];
 
-export type CustomerRegisterPayload = never;
-export type CustomerLoginPayload = never;
-export type CustomerBookingDetail = never;
+export type CustomerRegisterPayload = {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name?: string | null;
+};
+
+export type CustomerLoginPayload = LoginPayload;
+export type CustomerBookingDetail = MyBooking;
