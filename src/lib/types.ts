@@ -151,13 +151,30 @@ export type Booking = {
   note: string | null;
   created_at: string;
   updated_at: string;
+  passengers?: BookingPassenger[];
 };
 
 export type TenantBooking = Booking & {
   tour_title: string;
 };
 
-export type CreateBookingPayload = {
+export type BookingPassenger = {
+  id?: string;
+  booking_id?: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  passport_number: string | null;
+  birth_date: string | null;
+  gender: "male" | "female" | "other" | null;
+  nationality: string | null;
+  notes: string | null;
+  is_primary: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type BookingCreateRequest = {
   tour_id: string;
   customer_first_name: string;
   customer_last_name?: string | null;
@@ -165,11 +182,16 @@ export type CreateBookingPayload = {
   customer_phone?: string | null;
   traveler_count: number;
   note?: string | null;
+  passengers: Omit<BookingPassenger, "id" | "booking_id" | "created_at" | "updated_at">[];
 };
+
+export type CreateBookingPayload = BookingCreateRequest;
 
 export type BookingCreateResponse = {
   message: string;
-  booking: Booking;
+  booking: Booking & {
+    passengers?: BookingPassenger[];
+  };
 };
 
 export type BookingStatusUpdateResponse = {
