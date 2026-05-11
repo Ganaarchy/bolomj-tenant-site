@@ -46,6 +46,16 @@ export type LoginResponse = {
   user: AuthUser;
 };
 
+export type UpdateProfilePayload = {
+  first_name: string;
+  last_name?: string | null;
+  email: string;
+};
+
+export type UpdateProfileResponse = AuthUser | {
+  user: AuthUser;
+};
+
 export type PublicTenantWebsite = {
   id: string | null;
   site_title: string | null;
@@ -173,6 +183,7 @@ export const RESERVED_SUBDOMAINS = [
 export const CUSTOMER_ENDPOINTS_PENDING_VERIFICATION = [
   "POST /auth/customer/register",
   "POST /auth/customer/login",
+  "PATCH /auth/me",
   "GET /customer/bookings",
   "GET /customer/bookings/:id",
 ] as const;

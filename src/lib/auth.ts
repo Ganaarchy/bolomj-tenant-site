@@ -33,6 +33,12 @@ export function setAuth(accessToken: string, user: AuthUser) {
   notifyAuthChanged();
 }
 
+export function setStoredUser(user: AuthUser) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+  notifyAuthChanged();
+}
+
 export function clearAuth() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(STORAGE_KEYS.accessToken);
