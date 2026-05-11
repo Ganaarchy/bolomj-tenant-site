@@ -584,11 +584,25 @@ async function createBooking(
   payload: BookingCreateRequest,
   accessToken: string,
 ) {
-  return apiFetch<BookingCreateResponse>(`/public/tenants/${tenantSlug}/bookings`, {
-    method: "POST",
-    accessToken,
-    body: payload,
-  });
+  try {
+    return await apiFetch<BookingCreateResponse>(`/public/tenants/${tenantSlug}/bookings`, {
+      method: "POST",
+      accessToken,
+      body: payload,
+    });
+  } catch (err) {
+    if (!(err instanceof ApiError) || err.status !== 404) {
+      throw err;
+    }
+
+    // Live tenant-scoped booking can return a false 404 when customer auth/RLS hides public tour rows.
+    // The legacy create route still uses the authenticated customer token and derives tenant_id from tour_id.
+    return apiFetch<BookingCreateResponse>("/bookings", {
+      method: "POST",
+      accessToken,
+      body: payload,
+    });
+  }
 }
 
 function emptyToNull(value?: string | null) {
