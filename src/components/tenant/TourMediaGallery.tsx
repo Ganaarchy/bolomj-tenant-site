@@ -32,6 +32,8 @@ export function TourMediaGallery({ photos, tourTitle }: TourMediaGalleryProps) {
   }, [lightboxOpen, activeIndex]);
 
   if (!photos.length || !activePhoto) return null;
+  const previousPhoto = photos[activeIndex === 0 ? photos.length - 1 : activeIndex - 1];
+  const nextPhoto = photos[activeIndex === photos.length - 1 ? 0 : activeIndex + 1];
 
   function showPrevious() {
     setActiveIndex((current) => (current === 0 ? photos.length - 1 : current - 1));
@@ -56,72 +58,86 @@ export function TourMediaGallery({ photos, tourTitle }: TourMediaGalleryProps) {
       </div>
 
       <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-slate-950 shadow-sm">
-        <button
-          type="button"
-          className="group relative block aspect-[16/10] w-full bg-slate-900 text-left"
-          onClick={() => setLightboxOpen(true)}
-        >
-          <SafeImage
-            src={activePhoto.url}
-            alt={activePhoto.caption || `${tourTitle} аяллын зураг`}
-            sizes="(min-width: 1024px) 720px, 100vw"
-            fallback={<span className="px-4 text-center text-sm font-medium text-white">{tourTitle}</span>}
-          />
-          <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 bg-gradient-to-t from-slate-950/85 to-transparent p-4 text-white">
-            <span className="min-w-0 text-sm font-medium">
-              {activePhoto.caption || "Зургийг томоор харах"}
+        <div className="relative h-[280px] overflow-hidden bg-slate-950 sm:h-[380px] lg:h-[460px]">
+          {photos.length > 1 ? (
+            <>
+              <button
+                type="button"
+                className="absolute left-0 top-1/2 hidden h-[68%] w-[34%] -translate-y-1/2 overflow-hidden opacity-60 transition hover:opacity-80 sm:block"
+                onClick={showPrevious}
+                aria-label="Өмнөх зураг харах"
+              >
+                <SlideImage photo={previousPhoto} tourTitle={tourTitle} dimmed />
+              </button>
+              <button
+                type="button"
+                className="absolute right-0 top-1/2 hidden h-[68%] w-[34%] -translate-y-1/2 overflow-hidden opacity-60 transition hover:opacity-80 sm:block"
+                onClick={showNext}
+                aria-label="Дараах зураг харах"
+              >
+                <SlideImage photo={nextPhoto} tourTitle={tourTitle} dimmed />
+              </button>
+            </>
+          ) : null}
+
+          <button
+            type="button"
+            className="group absolute left-1/2 top-1/2 z-10 h-[86%] w-[82%] -translate-x-1/2 -translate-y-1/2 overflow-hidden bg-slate-900 text-left shadow-2xl sm:w-[72%]"
+            onClick={() => setLightboxOpen(true)}
+          >
+            <SlideImage photo={activePhoto} tourTitle={tourTitle} />
+            <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 bg-gradient-to-t from-slate-950/85 to-transparent p-4 text-white sm:p-5">
+              <span className="min-w-0">
+                <span className="block truncate text-base font-medium sm:text-lg">
+                  {activePhoto.caption || "Зургийг томоор харах"}
+                </span>
+              </span>
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/15 backdrop-blur transition group-hover:bg-white/25">
+                <Expand className="h-4 w-4" />
+              </span>
             </span>
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/15 backdrop-blur transition group-hover:bg-white/25">
-              <Expand className="h-4 w-4" />
-            </span>
-          </span>
-        </button>
+          </button>
+
+          {photos.length > 1 ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="absolute left-4 top-1/2 z-20 h-14 w-14 -translate-y-1/2 rounded-none border-2 border-amber-400 bg-slate-950/35 text-white backdrop-blur hover:bg-slate-950/55 hover:text-white sm:left-[8%]"
+                onClick={showPrevious}
+                aria-label="Өмнөх зураг"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="absolute right-4 top-1/2 z-20 h-14 w-14 -translate-y-1/2 rounded-none border-2 border-amber-400 bg-slate-950/35 text-white backdrop-blur hover:bg-slate-950/55 hover:text-white sm:right-[8%]"
+                onClick={showNext}
+                aria-label="Дараах зураг"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </Button>
+            </>
+          ) : null}
+        </div>
 
         {photos.length > 1 ? (
-          <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-slate-950 p-3">
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              className="h-9 w-9 shrink-0"
-              onClick={showPrevious}
-              aria-label="Өмнөх зураг"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1">
-              {photos.map((photo, index) => (
-                <button
-                  key={photo.id}
-                  type="button"
-                  className={cn(
-                    "relative h-16 w-24 shrink-0 overflow-hidden rounded-md border bg-slate-800 transition",
-                    index === activeIndex
-                      ? "border-white ring-2 ring-white/50"
-                      : "border-white/15 opacity-70 hover:opacity-100",
-                  )}
-                  onClick={() => setActiveIndex(index)}
-                  aria-label={`${index + 1}-р зураг`}
-                >
-                  <SafeImage
-                    src={photo.url}
-                    alt={photo.caption || `${tourTitle} аяллын зураг`}
-                    sizes="96px"
-                    fallback={<span className="sr-only">{photo.caption || tourTitle}</span>}
-                  />
-                </button>
-              ))}
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              className="h-9 w-9 shrink-0"
-              onClick={showNext}
-              aria-label="Дараах зураг"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center gap-2 overflow-x-auto border-t border-white/10 bg-slate-950 px-3 py-3">
+            {photos.map((photo, index) => (
+              <button
+                key={photo.id}
+                type="button"
+                className={cn(
+                  "h-1.5 shrink-0 rounded-full transition",
+                  index === activeIndex ? "w-8 bg-amber-400" : "w-3 bg-white/35 hover:bg-white/60",
+                )}
+                onClick={() => setActiveIndex(index)}
+                aria-label={`${index + 1}-р зураг`}
+              />
+            ))}
           </div>
         ) : null}
       </div>
@@ -188,5 +204,27 @@ export function TourMediaGallery({ photos, tourTitle }: TourMediaGalleryProps) {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function SlideImage({
+  photo,
+  tourTitle,
+  dimmed,
+}: {
+  photo: TourDetailPhoto;
+  tourTitle: string;
+  dimmed?: boolean;
+}) {
+  return (
+    <>
+      <SafeImage
+        src={photo.url}
+        alt={photo.caption || `${tourTitle} аяллын зураг`}
+        sizes="(min-width: 1024px) 760px, 100vw"
+        fallback={<span className="px-4 text-center text-sm font-medium text-white">{photo.caption || tourTitle}</span>}
+      />
+      {dimmed ? <span className="absolute inset-0 bg-slate-950/45" /> : null}
+    </>
   );
 }
